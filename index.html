@@ -1,0 +1,644 @@
+import { useState, useRef, useEffect } from "react";
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+const LIGAS = [
+  { id: "all", nome: "Todos", icon: "🌍" },
+  { id: "ucl", nome: "Champions", icon: "⭐" },
+  { id: "pl", nome: "Premier League", icon: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+  { id: "laliga", nome: "La Liga", icon: "🇪🇸" },
+  { id: "seriea", nome: "Serie A", icon: "🇮🇹" },
+  { id: "bundesliga", nome: "Bundesliga", icon: "🇩🇪" },
+  { id: "ligue1", nome: "Ligue 1", icon: "🇫🇷" },
+  { id: "brasileirao", nome: "Brasileirão", icon: "🇧🇷" },
+  { id: "libertadores", nome: "Libertadores", icon: "🏆" },
+];
+
+const JOGOS_HOJE = [
+  {
+    id: 1, liga: "ucl", ligaNome: "UEFA Champions League", ligaIcon: "⭐",
+    hora: "16:00", status: "hoje",
+    casa: { nome: "PSG", forca: 88, forma: ["V","V","E","V","V"], pais: "🇫🇷" },
+    fora: { nome: "Arsenal", forca: 84, forma: ["V","V","V","E","V"], pais: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    odds: { casa: 2.10, empate: 3.40, fora: 3.20 },
+    destaque: true,
+  },
+  {
+    id: 2, liga: "pl", ligaNome: "Premier League", ligaIcon: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    hora: "13:30", status: "hoje",
+    casa: { nome: "Man City", forca: 90, forma: ["V","V","V","E","V"], pais: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    fora: { nome: "Liverpool", forca: 89, forma: ["V","E","V","V","V"], pais: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    odds: { casa: 2.30, empate: 3.20, fora: 2.90 },
+    destaque: true,
+  },
+  {
+    id: 3, liga: "laliga", ligaNome: "La Liga", ligaIcon: "🇪🇸",
+    hora: "17:00", status: "hoje",
+    casa: { nome: "Barcelona", forca: 87, forma: ["V","V","V","V","E"], pais: "🇪🇸" },
+    fora: { nome: "Atlético", forca: 83, forma: ["E","V","V","E","V"], pais: "🇪🇸" },
+    odds: { casa: 1.85, empate: 3.50, fora: 4.10 },
+    destaque: false,
+  },
+  {
+    id: 4, liga: "brasileirao", ligaNome: "Brasileirão Série A", ligaIcon: "🇧🇷",
+    hora: "20:00", status: "hoje",
+    casa: { nome: "Flamengo", forca: 82, forma: ["V","V","E","V","V"], pais: "🇧🇷" },
+    fora: { nome: "Palmeiras", forca: 84, forma: ["V","V","V","E","V"], pais: "🇧🇷" },
+    odds: { casa: 2.40, empate: 3.10, fora: 2.70 },
+    destaque: false,
+  },
+  {
+    id: 5, liga: "bundesliga", ligaNome: "Bundesliga", ligaIcon: "🇩🇪",
+    hora: "15:30", status: "hoje",
+    casa: { nome: "Bayern", forca: 91, forma: ["V","V","V","V","V"], pais: "🇩🇪" },
+    fora: { nome: "Dortmund", forca: 82, forma: ["E","V","V","E","V"], pais: "🇩🇪" },
+    odds: { casa: 1.65, empate: 3.90, fora: 4.80 },
+    destaque: false,
+  },
+  {
+    id: 6, liga: "seriea", ligaNome: "Serie A", ligaIcon: "🇮🇹",
+    hora: "18:45", status: "hoje",
+    casa: { nome: "Inter", forca: 86, forma: ["V","V","E","V","V"], pais: "🇮🇹" },
+    fora: { nome: "Juventus", forca: 81, forma: ["V","E","V","V","E"], pais: "🇮🇹" },
+    odds: { casa: 2.00, empate: 3.30, fora: 3.60 },
+    destaque: false,
+  },
+  {
+    id: 7, liga: "libertadores", ligaNome: "Copa Libertadores", ligaIcon: "🏆",
+    hora: "21:30", status: "hoje",
+    casa: { nome: "Botafogo", forca: 78, forma: ["V","V","V","E","V"], pais: "🇧🇷" },
+    fora: { nome: "River Plate", forca: 83, forma: ["V","V","E","V","V"], pais: "🇦🇷" },
+    odds: { casa: 2.80, empate: 3.20, fora: 2.40 },
+    destaque: false,
+  },
+];
+
+// ─── COMPONENTES UTILITÁRIOS ──────────────────────────────────────────────────
+const FormaTag = ({ r }) => {
+  const cor = r === "V" ? "#22c55e" : r === "E" ? "#f59e0b" : "#ef4444";
+  return (
+    <span style={{ width: 20, height: 20, borderRadius: 4, background: cor, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>{r}</span>
+  );
+};
+
+const BarraForca = ({ valor, cor }) => (
+  <div style={{ height: 4, background: "#1a1a1a", borderRadius: 2, overflow: "hidden", width: "100%" }}>
+    <div style={{ height: "100%", width: `${valor}%`, background: cor, borderRadius: 2, transition: "width 1s ease" }} />
+  </div>
+);
+
+// ─── LANDING PAGE ─────────────────────────────────────────────────────────────
+function Landing({ onEntrar }) {
+  const [hover, setHover] = useState(false);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#050508", color: "#f0f0f0", fontFamily: "'Georgia', serif", overflowX: "hidden" }}>
+
+      {/* NAV */}
+      <nav style={{ padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #0f0f14", position: "sticky", top: 0, background: "rgba(5,5,8,0.95)", backdropFilter: "blur(12px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#00d4ff,#0066ff)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>⚡</div>
+          <span style={{ fontWeight: 900, fontSize: 18, letterSpacing: -1 }}>SCOUT <span style={{ color: "#00d4ff" }}>IA</span></span>
+        </div>
+        <button onClick={onEntrar} style={{ background: "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 100, padding: "10px 24px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif", letterSpacing: 1 }}>
+          ACESSAR GRÁTIS
+        </button>
+      </nav>
+
+      {/* HERO */}
+      <div style={{ position: "relative", padding: "100px 24px 80px", textAlign: "center", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 70% 50% at 50% 0%,rgba(0,212,255,0.08) 0%,transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(0,212,255,0.05) 1px,transparent 1px)", backgroundSize: "40px 40px", pointerEvents: "none" }} />
+
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)", borderRadius: 100, padding: "6px 18px", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "#00d4ff", marginBottom: 32 }}>
+          ⚡ análise esportiva com inteligência artificial
+        </div>
+
+        <h1 style={{ fontSize: "clamp(44px,10vw,88px)", fontWeight: 900, lineHeight: 0.95, letterSpacing: -4, margin: "0 0 16px" }}>
+          <span style={{ background: "linear-gradient(135deg,#fff 0%,#888 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>PARE DE</span><br />
+          <span style={{ background: "linear-gradient(135deg,#00d4ff 0%,#0066ff 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>APOSTAR</span><br />
+          <span style={{ background: "linear-gradient(135deg,#fff 0%,#888 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>NO ACHISMO</span>
+        </h1>
+
+        <p style={{ fontSize: "clamp(16px,3vw,20px)", color: "#555", maxWidth: 540, margin: "24px auto 48px", lineHeight: 1.7 }}>
+          Análise profissional com IA antes de cada jogo. Champions League, Premier League, Brasileirão e mais — tudo numa plataforma.
+        </p>
+
+        <button
+          onClick={onEntrar}
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+          style={{ background: hover ? "linear-gradient(135deg,#33ddff,#0077ff)" : "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 100, padding: "20px 56px", color: "#fff", fontSize: 17, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif", letterSpacing: 1, transition: "all 0.3s", transform: hover ? "translateY(-3px)" : "none", boxShadow: hover ? "0 16px 48px rgba(0,212,255,0.35)" : "0 4px 24px rgba(0,212,255,0.15)", marginBottom: 14 }}
+        >
+          ANALISAR JOGOS DE HOJE →
+        </button>
+        <p style={{ color: "#222", fontSize: 11, letterSpacing: 2 }}>GRÁTIS POR 7 DIAS · SEM CARTÃO</p>
+
+        {/* Ligas preview */}
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 56 }}>
+          {["⭐ Champions","🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier","🇪🇸 La Liga","🇮🇹 Serie A","🇩🇪 Bundesliga","🇫🇷 Ligue 1","🇧🇷 Brasileirão","🏆 Libertadores"].map((l,i) => (
+            <span key={i} style={{ background: "#0a0a10", border: "1px solid #111", borderRadius: 100, padding: "6px 16px", fontSize: 12, color: "#444" }}>{l}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* COMO FUNCIONA */}
+      <div style={{ padding: "80px 24px", maxWidth: 860, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 56 }}>
+          <div style={{ fontSize: 11, letterSpacing: 4, color: "#333", marginBottom: 12, textTransform: "uppercase" }}>como funciona</div>
+          <h2 style={{ fontSize: "clamp(28px,5vw,42px)", fontWeight: 900, letterSpacing: -2 }}>Análise que <span style={{ color: "#00d4ff" }}>você entende</span></h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16 }}>
+          {[
+            { n: "01", t: "Veja os jogos do dia", d: "Todos os jogos das principais ligas do mundo organizados por hora e liga." },
+            { n: "02", t: "Escolha uma partida", d: "Clique em qualquer jogo para ver a análise completa gerada por IA." },
+            { n: "03", t: "Leia a análise", d: "Força dos elencos, forma recente, histórico do confronto e palpite fundamentado." },
+            { n: "04", t: "Você decide", d: "A análise é sua base. A decisão final é sempre sua. Aposte com mais consciência." },
+          ].map((s,i) => (
+            <div key={i} style={{ background: "#08080f", border: "1px solid #111", borderRadius: 16, padding: "28px 22px" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor="#00d4ff33"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor="#111"; }}
+            >
+              <div style={{ fontSize: 36, fontWeight: 900, color: "#0f0f18", marginBottom: 16, letterSpacing: -2 }}>{s.n}</div>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>{s.t}</div>
+              <div style={{ color: "#444", fontSize: 13, lineHeight: 1.6 }}>{s.d}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* PREÇO */}
+      <div style={{ padding: "80px 24px", background: "#030306", textAlign: "center" }}>
+        <div style={{ fontSize: 11, letterSpacing: 4, color: "#333", marginBottom: 12, textTransform: "uppercase" }}>investimento</div>
+        <h2 style={{ fontSize: "clamp(28px,5vw,42px)", fontWeight: 900, letterSpacing: -2, marginBottom: 48 }}>Menos que uma aposta. <span style={{ color: "#00d4ff" }}>Toda vida.</span></h2>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 680, margin: "0 auto" }}>
+
+          <div style={{ flex: 1, minWidth: 220, background: "#08080f", border: "1px solid #111", borderRadius: 20, padding: "36px 24px" }}>
+            <div style={{ fontSize: 12, color: "#333", letterSpacing: 2, marginBottom: 16, textTransform: "uppercase" }}>Grátis</div>
+            <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: -2, marginBottom: 4 }}>R$0</div>
+            <div style={{ color: "#222", fontSize: 12, marginBottom: 28 }}>7 dias de teste</div>
+            {["3 análises por dia","Principais ligas","Chat com IA"].map((f,i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, fontSize: 13, color: "#444" }}><span style={{ color: "#222" }}>✓</span>{f}</div>
+            ))}
+            <button onClick={onEntrar} style={{ width: "100%", marginTop: 24, background: "transparent", border: "1px solid #1a1a1a", borderRadius: 100, padding: 12, color: "#444", fontSize: 13, cursor: "pointer", fontFamily: "'Georgia', serif" }}>Começar grátis</button>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 220, background: "linear-gradient(135deg,#030310,#08080f)", border: "1px solid #00d4ff44", borderRadius: 20, padding: "36px 24px", position: "relative" }}>
+            <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "linear-gradient(135deg,#00d4ff,#0066ff)", borderRadius: 100, padding: "4px 16px", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, whiteSpace: "nowrap" }}>MAIS POPULAR</div>
+            <div style={{ fontSize: 12, color: "#00d4ff", letterSpacing: 2, marginBottom: 16, textTransform: "uppercase" }}>Pro</div>
+            <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: -2, marginBottom: 4 }}>R$37</div>
+            <div style={{ color: "#444", fontSize: 12, marginBottom: 28 }}>por mês</div>
+            {["Análises ilimitadas","Todas as ligas do mundo","Chat IA sem limites","Alertas de jogos","Histórico completo","Sem anúncios"].map((f,i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, fontSize: 13, color: "#ccc" }}><span style={{ color: "#00d4ff" }}>✓</span>{f}</div>
+            ))}
+            <button onClick={onEntrar} style={{ width: "100%", marginTop: 24, background: "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 100, padding: 14, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif" }}>Assinar por R$37/mês</button>
+          </div>
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <div style={{ padding: "80px 24px", textAlign: "center" }}>
+        <h2 style={{ fontSize: "clamp(28px,6vw,52px)", fontWeight: 900, letterSpacing: -2, marginBottom: 28, lineHeight: 1.1 }}>
+          Cada análise pode ser<br /><span style={{ color: "#00d4ff" }}>a diferença.</span>
+        </h2>
+        <button onClick={onEntrar} style={{ background: "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 100, padding: "18px 48px", color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "'Georgia', serif", cursor: "pointer", letterSpacing: 1 }}>
+          COMEÇAR AGORA →
+        </button>
+        <p style={{ color: "#111", fontSize: 11, marginTop: 40, letterSpacing: 2 }}>SCOUT IA · ANÁLISE ESPORTIVA COM INTELIGÊNCIA ARTIFICIAL · 2026</p>
+        <p style={{ color: "#1a1a1a", fontSize: 10, marginTop: 8 }}>⚠ Somente para maiores de 18 anos. Aposte com responsabilidade.</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── HOME DO APP ──────────────────────────────────────────────────────────────
+function HomeApp({ onJogo, onChat }) {
+  const [liga, setLiga] = useState("all");
+  const [busca, setBusca] = useState("");
+
+  const filtrados = JOGOS_HOJE.filter(j => {
+    const passaLiga = liga === "all" || j.liga === liga;
+    const passaBusca = !busca || j.casa.nome.toLowerCase().includes(busca.toLowerCase()) || j.fora.nome.toLowerCase().includes(busca.toLowerCase());
+    return passaLiga && passaBusca;
+  });
+
+  const destaques = filtrados.filter(j => j.destaque);
+  const outros = filtrados.filter(j => !j.destaque);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#050508", fontFamily: "'Georgia', serif", color: "#f0f0f0" }}>
+
+      {/* Header */}
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #0f0f14", display: "flex", alignItems: "center", gap: 12, background: "#050508", position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(12px)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 28, height: 28, background: "linear-gradient(135deg,#00d4ff,#0066ff)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>⚡</div>
+          <span style={{ fontWeight: 900, fontSize: 16, letterSpacing: -1 }}>SCOUT <span style={{ color: "#00d4ff" }}>IA</span></span>
+        </div>
+        <div style={{ flex: 1, background: "#0a0a10", border: "1px solid #111", borderRadius: 100, padding: "8px 14px", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: "#333", fontSize: 14 }}>🔍</span>
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar time ou liga..." style={{ background: "none", border: "none", color: "#f0f0f0", fontSize: 13, fontFamily: "'Georgia', serif", outline: "none", flex: 1 }} />
+        </div>
+        <button onClick={onChat} style={{ background: "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 100, padding: "8px 16px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif", whiteSpace: "nowrap" }}>
+          💬 IA
+        </button>
+      </div>
+
+      {/* Filtro de ligas */}
+      <div style={{ padding: "16px 20px 0", display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none" }}>
+        {LIGAS.map(l => (
+          <button key={l.id} onClick={() => setLiga(l.id)} style={{ background: liga === l.id ? "linear-gradient(135deg,#00d4ff,#0066ff)" : "#0a0a10", border: liga === l.id ? "none" : "1px solid #111", borderRadius: 100, padding: "7px 16px", color: liga === l.id ? "#fff" : "#444", fontSize: 12, fontWeight: liga === l.id ? 700 : 400, cursor: "pointer", fontFamily: "'Georgia', serif", whiteSpace: "nowrap", transition: "all 0.2s" }}>
+            {l.icon} {l.nome}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: "20px", maxWidth: 760, margin: "0 auto" }}>
+
+        {/* Data */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <div style={{ fontSize: 11, letterSpacing: 3, color: "#333", textTransform: "uppercase" }}>JOGOS DE HOJE</div>
+          <div style={{ flex: 1, height: 1, background: "#0f0f14" }} />
+          <div style={{ fontSize: 11, color: "#222" }}>{filtrados.length} partidas</div>
+        </div>
+
+        {/* Destaques */}
+        {destaques.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#00d4ff44", textTransform: "uppercase", marginBottom: 12 }}>🔥 JOGOS EM DESTAQUE</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {destaques.map(j => <CardJogo key={j.id} jogo={j} destaque onClick={() => onJogo(j)} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Outros jogos */}
+        {outros.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#333", textTransform: "uppercase", marginBottom: 12 }}>TODOS OS JOGOS</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {outros.map(j => <CardJogo key={j.id} jogo={j} onClick={() => onJogo(j)} />)}
+            </div>
+          </div>
+        )}
+
+        {filtrados.length === 0 && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#222" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>🔍</div>
+            <div>Nenhum jogo encontrado</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CardJogo({ jogo, destaque, onClick }) {
+  const [hover, setHover] = useState(false);
+  const corBorda = hover ? (destaque ? "#00d4ff44" : "#00d4ff22") : (destaque ? "#00d4ff22" : "#0f0f14");
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ background: destaque ? "linear-gradient(135deg,#06060f,#080810)" : "#080810", border: `1px solid ${corBorda}`, borderRadius: 16, padding: destaque ? "20px" : "16px", cursor: "pointer", transition: "all 0.2s", transform: hover ? "translateY(-1px)" : "none" }}
+    >
+      {/* Liga + hora */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 12 }}>{jogo.ligaIcon}</span>
+          <span style={{ fontSize: 11, color: "#333", letterSpacing: 1 }}>{jogo.ligaNome}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {destaque && <span style={{ background: "rgba(0,212,255,0.1)", border: "1px solid rgba(0,212,255,0.2)", borderRadius: 100, padding: "2px 8px", fontSize: 9, color: "#00d4ff", letterSpacing: 2 }}>DESTAQUE</span>}
+          <span style={{ fontSize: 12, color: "#444" }}>⏰ {jogo.hora}</span>
+        </div>
+      </div>
+
+      {/* Times */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {/* Casa */}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: destaque ? 17 : 14, marginBottom: 4 }}>{jogo.casa.pais} {jogo.casa.nome}</div>
+          <div style={{ display: "flex", gap: 3, marginBottom: 6 }}>
+            {jogo.casa.forma.map((r,i) => <FormaTag key={i} r={r} />)}
+          </div>
+          <BarraForca valor={jogo.casa.forca} cor="#00d4ff" />
+          <span style={{ fontSize: 10, color: "#333" }}>{jogo.casa.forca}/100</span>
+        </div>
+
+        {/* VS */}
+        <div style={{ textAlign: "center", flexShrink: 0 }}>
+          <div style={{ fontSize: 11, color: "#222", fontWeight: 900, letterSpacing: 2 }}>VS</div>
+          <div style={{ marginTop: 6, display: "flex", gap: 4 }}>
+            <div style={{ background: "#0a0a14", border: "1px solid #111", borderRadius: 6, padding: "3px 6px", fontSize: 11, color: "#555" }}>{jogo.odds.casa}</div>
+            <div style={{ background: "#0a0a14", border: "1px solid #111", borderRadius: 6, padding: "3px 6px", fontSize: 11, color: "#555" }}>{jogo.odds.empate}</div>
+            <div style={{ background: "#0a0a14", border: "1px solid #111", borderRadius: 6, padding: "3px 6px", fontSize: 11, color: "#555" }}>{jogo.odds.fora}</div>
+          </div>
+          <div style={{ fontSize: 9, color: "#222", marginTop: 3 }}>1 · X · 2</div>
+        </div>
+
+        {/* Fora */}
+        <div style={{ flex: 1, textAlign: "right" }}>
+          <div style={{ fontWeight: 800, fontSize: destaque ? 17 : 14, marginBottom: 4 }}>{jogo.fora.nome} {jogo.fora.pais}</div>
+          <div style={{ display: "flex", gap: 3, justifyContent: "flex-end", marginBottom: 6 }}>
+            {jogo.fora.forma.map((r,i) => <FormaTag key={i} r={r} />)}
+          </div>
+          <BarraForca valor={jogo.fora.forca} cor="#f59e0b" />
+          <span style={{ fontSize: 10, color: "#333" }}>{jogo.fora.forca}/100</span>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+        <span style={{ fontSize: 11, color: "#00d4ff44" }}>Ver análise completa →</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── TELA DE ANÁLISE ──────────────────────────────────────────────────────────
+function TelaAnalise({ jogo, onVoltar, onChat }) {
+  const [analise, setAnalise] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    gerarAnalise();
+  }, []);
+
+  const gerarAnalise = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: `Você é um analista esportivo profissional especializado em futebol mundial. Analise jogos de forma objetiva, técnica e fundamentada para ajudar apostadores a tomar decisões mais conscientes. NUNCA prometa resultados. Sempre deixe claro que é uma análise, não uma certeza. Responda SOMENTE em JSON válido, sem texto antes ou depois, no seguinte formato exato:
+{
+  "forca_casa": "análise em 2 frases do time da casa",
+  "forca_fora": "análise em 2 frases do time visitante", 
+  "historico": "1 frase sobre histórico do confronto",
+  "fator_campo": "1 frase sobre vantagem ou não de jogar em casa",
+  "palpite": "qual time tem ligeira vantagem e por quê — 2 frases. SEMPRE inclua que é uma análise, não garantia",
+  "pontos_atencao": "2 fatores que podem mudar o resultado",
+  "placar_provavel": "ex: 2-1 ou 1-1",
+  "confianca": "Alta / Média / Baixa",
+  "aviso": "frase curta lembrando que aposta tem risco e a decisão é do usuário"
+}`,
+          messages: [{
+            role: "user",
+            content: `Analise o jogo: ${jogo.casa.nome} vs ${jogo.fora.nome} — ${jogo.ligaNome}. 
+Força ${jogo.casa.nome}: ${jogo.casa.forca}/100, forma recente: ${jogo.casa.forma.join("-")}.
+Força ${jogo.fora.nome}: ${jogo.fora.forca}/100, forma recente: ${jogo.fora.forma.join("-")}.
+Odds: ${jogo.casa.nome} ${jogo.odds.casa} | Empate ${jogo.odds.empate} | ${jogo.fora.nome} ${jogo.odds.fora}.`
+          }],
+        }),
+      });
+      const data = await res.json();
+      const texto = data.content?.[0]?.text || "{}";
+      const clean = texto.replace(/```json|```/g, "").trim();
+      setAnalise(JSON.parse(clean));
+    } catch {
+      setAnalise({ erro: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confCor = analise?.confianca === "Alta" ? "#22c55e" : analise?.confianca === "Média" ? "#f59e0b" : "#ef4444";
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#050508", fontFamily: "'Georgia', serif", color: "#f0f0f0" }}>
+
+      {/* Header */}
+      <div style={{ padding: "14px 20px", borderBottom: "1px solid #0f0f14", display: "flex", alignItems: "center", gap: 12, background: "#050508", position: "sticky", top: 0, zIndex: 10 }}>
+        <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#444", cursor: "pointer", fontSize: 20 }}>←</button>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>{jogo.casa.nome} vs {jogo.fora.nome}</div>
+          <div style={{ fontSize: 10, color: "#2a2a2a", letterSpacing: 2 }}>{jogo.ligaNome.toUpperCase()} · {jogo.hora}</div>
+        </div>
+        <button onClick={onChat} style={{ marginLeft: "auto", background: "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 100, padding: "8px 16px", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif" }}>💬 Perguntar à IA</button>
+      </div>
+
+      <div style={{ padding: "20px", maxWidth: 680, margin: "0 auto" }}>
+
+        {/* Card times */}
+        <div style={{ background: "linear-gradient(135deg,#060610,#08080f)", border: "1px solid #00d4ff22", borderRadius: 20, padding: 24, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 26, fontWeight: 900, marginBottom: 4 }}>{jogo.casa.nome}</div>
+              <div style={{ fontSize: 11, color: "#333", marginBottom: 10 }}>MANDANTE</div>
+              <div style={{ display: "flex", gap: 3, justifyContent: "center", marginBottom: 8 }}>
+                {jogo.casa.forma.map((r,i) => <FormaTag key={i} r={r} />)}
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: "#00d4ff" }}>{jogo.casa.forca}</div>
+              <div style={{ fontSize: 10, color: "#333" }}>força</div>
+            </div>
+
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "#222", fontWeight: 900, letterSpacing: 3 }}>VS</div>
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                {[["1", jogo.odds.casa], ["X", jogo.odds.empate], ["2", jogo.odds.fora]].map(([l,v]) => (
+                  <div key={l} style={{ background: "#0a0a14", border: "1px solid #111", borderRadius: 8, padding: "4px 10px", display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "#333" }}>{l}</span>
+                    <span style={{ fontSize: 11, color: "#888", fontWeight: 700 }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 26, fontWeight: 900, marginBottom: 4 }}>{jogo.fora.nome}</div>
+              <div style={{ fontSize: 11, color: "#333", marginBottom: 10 }}>VISITANTE</div>
+              <div style={{ display: "flex", gap: 3, justifyContent: "center", marginBottom: 8 }}>
+                {jogo.fora.forma.map((r,i) => <FormaTag key={i} r={r} />)}
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: "#f59e0b" }}>{jogo.fora.forca}</div>
+              <div style={{ fontSize: 10, color: "#333" }}>força</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Análise */}
+        {loading ? (
+          <div style={{ background: "#08080f", border: "1px solid #111", borderRadius: 20, padding: 40, textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 16 }}>⚡</div>
+            <div style={{ fontSize: 14, color: "#444", marginBottom: 8 }}>Gerando análise com IA...</div>
+            <div style={{ fontSize: 12, color: "#222" }}>Analisando elenco, forma e histórico</div>
+          </div>
+        ) : analise?.erro ? (
+          <div style={{ background: "#08080f", border: "1px solid #111", borderRadius: 20, padding: 32, textAlign: "center" }}>
+            <div style={{ color: "#444" }}>Erro ao gerar análise. Tente novamente.</div>
+            <button onClick={gerarAnalise} style={{ marginTop: 16, background: "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 100, padding: "10px 24px", color: "#fff", cursor: "pointer", fontFamily: "'Georgia', serif", fontSize: 13 }}>Tentar novamente</button>
+          </div>
+        ) : analise && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+            {/* Palpite destaque */}
+            <div style={{ background: "linear-gradient(135deg,#030310,#06060f)", border: "1px solid #00d4ff33", borderRadius: 16, padding: 22 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ fontSize: 11, letterSpacing: 3, color: "#00d4ff", textTransform: "uppercase" }}>⚡ Palpite da IA</div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#444" }}>Placar provável: <strong style={{ color: "#888" }}>{analise.placar_provavel}</strong></span>
+                  <span style={{ background: confCor + "22", border: `1px solid ${confCor}44`, borderRadius: 100, padding: "2px 10px", fontSize: 10, color: confCor, letterSpacing: 1 }}>{analise.confianca}</span>
+                </div>
+              </div>
+              <p style={{ fontSize: 14, lineHeight: 1.7, color: "#ccc", margin: 0 }}>{analise.palpite}</p>
+            </div>
+
+            {/* Grid de análises */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ background: "#08080f", border: "1px solid #0f0f14", borderRadius: 14, padding: 18 }}>
+                <div style={{ fontSize: 10, letterSpacing: 2, color: "#00d4ff44", marginBottom: 10, textTransform: "uppercase" }}>🏠 {jogo.casa.nome}</div>
+                <p style={{ fontSize: 13, color: "#777", lineHeight: 1.6, margin: 0 }}>{analise.forca_casa}</p>
+              </div>
+              <div style={{ background: "#08080f", border: "1px solid #0f0f14", borderRadius: 14, padding: 18 }}>
+                <div style={{ fontSize: 10, letterSpacing: 2, color: "#f59e0b44", marginBottom: 10, textTransform: "uppercase" }}>✈ {jogo.fora.nome}</div>
+                <p style={{ fontSize: 13, color: "#777", lineHeight: 1.6, margin: 0 }}>{analise.forca_fora}</p>
+              </div>
+            </div>
+
+            <div style={{ background: "#08080f", border: "1px solid #0f0f14", borderRadius: 14, padding: 18 }}>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: "#555", marginBottom: 10, textTransform: "uppercase" }}>📊 Histórico do Confronto</div>
+              <p style={{ fontSize: 13, color: "#777", lineHeight: 1.6, margin: 0 }}>{analise.historico}</p>
+            </div>
+
+            <div style={{ background: "#08080f", border: "1px solid #0f0f14", borderRadius: 14, padding: 18 }}>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: "#555", marginBottom: 10, textTransform: "uppercase" }}>⚠ Pontos de Atenção</div>
+              <p style={{ fontSize: 13, color: "#777", lineHeight: 1.6, margin: 0 }}>{analise.pontos_atencao}</p>
+            </div>
+
+            {/* Aviso */}
+            <div style={{ background: "#0a0a08", border: "1px solid #1a1a10", borderRadius: 12, padding: 16 }}>
+              <p style={{ fontSize: 12, color: "#444", lineHeight: 1.6, margin: 0, textAlign: "center" }}>⚠ {analise.aviso}</p>
+            </div>
+
+            <button onClick={onChat} style={{ background: "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", borderRadius: 14, padding: 16, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Georgia', serif", letterSpacing: 1 }}>
+              💬 Perguntar mais sobre esse jogo à IA →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── CHAT ─────────────────────────────────────────────────────────────────────
+function TelaChat({ jogoContexto, onVoltar }) {
+  const [msgs, setMsgs] = useState([{
+    role: "assistant",
+    text: jogoContexto
+      ? `Estou pronto para analisar **${jogoContexto.casa.nome} x ${jogoContexto.fora.nome}** 🔍\n\nPode perguntar tudo — escalações, histórico, estatísticas, mercados de aposta... O que você quer saber?`
+      : `Olá! Sou o analista esportivo do Scout IA ⚡\n\nPode perguntar sobre qualquer jogo do mundo — Champions League, Premier League, Brasileirão, La Liga e muito mais. Qual partida você quer analisar?`,
+  }]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [msgs, loading]);
+
+  const enviar = async (texto) => {
+    const msg = texto || input.trim();
+    if (!msg || loading) return;
+    setInput("");
+    const novas = [...msgs, { role: "user", text: msg }];
+    setMsgs(novas);
+    setLoading(true);
+    try {
+      const contextoJogo = jogoContexto ? `Contexto: estamos analisando ${jogoContexto.casa.nome} vs ${jogoContexto.fora.nome} (${jogoContexto.ligaNome}). Força ${jogoContexto.casa.nome}: ${jogoContexto.casa.forca}/100. Força ${jogoContexto.fora.nome}: ${jogoContexto.fora.forca}/100.` : "";
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: `Você é um analista esportivo profissional especializado em futebol mundial, trabalhando para o Scout IA. ${contextoJogo} Responda sempre em português brasileiro, de forma direta e analítica. Use dados, estatísticas e contexto técnico para fundamentar suas respostas. NUNCA prometa resultados ou incentive apostas. Seja honesto sobre incertezas. Máximo 4 parágrafos.`,
+          messages: novas.map(m => ({ role: m.role, content: m.text })),
+        }),
+      });
+      const data = await res.json();
+      setMsgs([...novas, { role: "assistant", text: data.content?.[0]?.text || "Erro ao responder." }]);
+    } catch { setMsgs([...novas, { role: "assistant", text: "Erro de conexão." }]); }
+    finally { setLoading(false); }
+  };
+
+  const fmt = t => t.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>");
+
+  const QUICK = jogoContexto
+    ? [`Por que ${jogoContexto.casa.nome} tem vantagem?`, `Qual o histórico desse confronto?`, "Quais mercados são mais interessantes?", "Que jogadores podem decidir?"]
+    : ["Análise do PSG x Arsenal de hoje", "Quem vai ganhar o Brasileirão?", "Análise do Man City x Liverpool", "Champions League — quem é favorito?"];
+
+  return (
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#050508", fontFamily: "'Georgia', serif", color: "#f0f0f0", maxWidth: 700, margin: "0 auto" }}>
+      <div style={{ padding: "14px 18px", borderBottom: "1px solid #0f0f14", display: "flex", alignItems: "center", gap: 12, background: "#050508" }}>
+        <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#444", cursor: "pointer", fontSize: 20 }}>←</button>
+        <div style={{ width: 34, height: 34, background: "linear-gradient(135deg,#00d4ff,#0066ff)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>⚡</div>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>Analista IA</div>
+          <div style={{ fontSize: 10, color: "#1a1a1a", letterSpacing: 2 }}>{jogoContexto ? `${jogoContexto.casa.nome} vs ${jogoContexto.fora.nome}` : "FUTEBOL MUNDIAL"}</div>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e" }} />
+          <span style={{ fontSize: 11, color: "#2a2a2a" }}>online</span>
+        </div>
+      </div>
+
+      <div ref={ref} style={{ flex: 1, overflowY: "auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+        {msgs.map((m,i) => (
+          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+            <div style={{ maxWidth: "84%", padding: "13px 17px", borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: m.role === "user" ? "linear-gradient(135deg,#00d4ff,#0066ff)" : "#0a0a10", border: m.role === "assistant" ? "1px solid #0f0f14" : "none", fontSize: 14, lineHeight: 1.7, color: "#f0f0f0" }} dangerouslySetInnerHTML={{ __html: fmt(m.text) }} />
+          </div>
+        ))}
+        {loading && (
+          <div style={{ display: "flex" }}>
+            <div style={{ padding: "14px 18px", borderRadius: "18px 18px 18px 4px", background: "#0a0a10", border: "1px solid #0f0f14", display: "flex", gap: 5, alignItems: "center" }}>
+              {[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", animation: `bounce 1.2s ease-in-out ${i*0.2}s infinite` }} />)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {msgs.length <= 1 && (
+        <div style={{ padding: "0 16px 10px", display: "flex", gap: 7, overflowX: "auto", scrollbarWidth: "none" }}>
+          {QUICK.map((s,i) => (
+            <button key={i} onClick={() => enviar(s)}
+              onMouseEnter={e => { e.currentTarget.style.borderColor="#00d4ff44"; e.currentTarget.style.color="#ccc"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor="#0f0f14"; e.currentTarget.style.color="#444"; }}
+              style={{ background: "#0a0a10", border: "1px solid #0f0f14", borderRadius: 20, padding: "7px 14px", color: "#444", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'Georgia', serif", transition: "all 0.2s" }}
+            >{s}</button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ padding: "13px 16px", borderTop: "1px solid #0f0f14", background: "#050508", display: "flex", gap: 10, alignItems: "center" }}>
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && enviar()}
+          placeholder="Pergunte sobre qualquer jogo..."
+          style={{ flex: 1, background: "#0a0a10", border: "1px solid #0f0f14", borderRadius: 24, padding: "11px 18px", color: "#f0f0f0", fontSize: 14, fontFamily: "'Georgia', serif", outline: "none" }} />
+        <button onClick={() => enviar()} disabled={loading || !input.trim()} style={{ width: 42, height: 42, borderRadius: "50%", flexShrink: 0, background: loading || !input.trim() ? "#0a0a10" : "linear-gradient(135deg,#00d4ff,#0066ff)", border: "none", cursor: loading || !input.trim() ? "default" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>➤</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── APP ROOT ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [tela, setTela] = useState("landing");
+  const [jogoAtual, setJogoAtual] = useState(null);
+  const [chatContexto, setChatContexto] = useState(null);
+
+  return (
+    <>
+      {tela === "landing" && <Landing onEntrar={() => setTela("home")} />}
+      {tela === "home" && <HomeApp onJogo={j => { setJogoAtual(j); setTela("analise"); }} onChat={() => { setChatContexto(null); setTela("chat"); }} />}
+      {tela === "analise" && jogoAtual && <TelaAnalise jogo={jogoAtual} onVoltar={() => setTela("home")} onChat={() => { setChatContexto(jogoAtual); setTela("chat"); }} />}
+      {tela === "chat" && <TelaChat jogoContexto={chatContexto} onVoltar={() => setTela(jogoAtual ? "analise" : "home")} />}
+      <style>{`
+        @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+        *{box-sizing:border-box;margin:0;padding:0;}
+        ::-webkit-scrollbar{width:3px;height:3px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:#111;border-radius:2px;}
+      `}</style>
+    </>
+  );
+}
